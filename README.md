@@ -1,166 +1,132 @@
 # SafeTraq ML Pipeline
 
-An ML engineering project focused on detecting potential vehicle crashes using smartphone motion-sensor data.
+Crash detection from smartphone motion-sensor data: data preparation, model comparison, and a stress test on real driving sessions.
 
-This repository organizes and validates the machine-learning components of SafeTraq, a team graduation project involving smartphone-based crash detection. It provides a separate, ML-focused workspace for inspecting datasets, preprocessing sensor signals, evaluating models, and documenting deployment requirements.
+This repository holds the machine-learning part of **SafeTraq**, a team graduation project (Ain Shams University, 2026). The Android app and website were built by teammates and live in the team repository: [Crash_Detection_App](https://github.com/AHDABOSAMA/Crash_Detection_App).
 
-> **Current status:** The repository contains synthetic sensor data, preprocessed arrays, original training scripts, and four model files. Initial structural checks have been completed. Full inference validation, reproducible evaluation, and training-to-deployment consistency checks remain in progress.
+## Key finding
 
-## Problem
+Models that look fine on simulated data can fail badly on real driving.
 
-Accelerometer and gyroscope readings can capture sudden changes in vehicle motion. However, hard braking, potholes, and other ordinary driving events may resemble crashes. A useful crash-detection system must evaluate both crash detection and false alarms.
+- On the simulated test split, all eight models land within about ten points of each other. Random Forest scores highest (80.5% accuracy).
+- On 22 real driving sessions (speed bumps, potholes, aggressive, standard and slow driving), **Random Forest flagged every window as a crash**, while the **CNN+GRU flagged 5.4%**.
+- Potholes are the weak spot: 25.5% of pothole windows were flagged, mostly from a single session.
 
-## Repository contents
+Details and caveats are in [Results](#results) and [Limitations](#limitations).
 
-- **Synthetic sensor data:** 300 CSV files across six generated scenarios.
-- **Processed data:** Training and test arrays, labels, and normalization parameters.
-- **Original training scripts:** Data generation, preprocessing, model training, and evaluation.
-- **Training artifacts:** A Keras model and a TensorFlow Lite export.
-- **Deployment artifacts:** Two TensorFlow Lite models with associated scaler parameter files.
-- **Validation code:** A Python data-validation module and automated tests.
+## The pipeline
 
-The data and model artifacts are included in this repository. Their presence does not, by itself, establish real-world accuracy or deployment readiness.
+The full pipeline is in [`notebooks/01_data_pipeline_and_models.ipynb`](notebooks/01_data_pipeline_and_models.ipynb), with saved outputs.
+
+1. **Load and merge 7 sources.** Crash and normal-driving recordings from two machines, with mixed delimiters and one malformed single-column CSV that is detected and repaired. Each row keeps its session and source ID.
+2. **Clean.** Drop duplicates and missing rows, sort by time, and set crash labels to 0 in the traffic-jam file, which is known to contain normal driving only.
+3. **Clip.** Limit each sensor channel to its 0.1st to 99.9th percentile.
+4. **Segment.** Start a new segment wherever the gap between samples exceeds 0.3 s (333 segments).
+5. **Window.** 60 timesteps (about 3 s at an effective 20 Hz) by 7 features (accelerometer XYZ, gyroscope XYZ, speed), step 30 (50% overlap). A window is a crash if any sample in it is a crash. Result: **6,830 windows** (3,383 normal, 3,447 crash).
+6. **Split without leakage.** `GroupShuffleSplit` by segment (test size 0.2, seed 68), so windows from one segment never land in both train and test. The notebook checks that the groups do not overlap.
+7. **Scale.** `StandardScaler` fitted on training data only.
+8. **Compare eight models** and evaluate the best deep model on real sessions.
+
+Steps 5 and 6 are also available as tested functions in `src/safetraq/`.
+
+## Results
+
+### Model comparison (simulated test split)
+
+| Model | Accuracy | Precision | Recall | F1 | ROC-AUC | PR-AUC |
+|---|---|---|---|---|---|---|
+| Random Forest | 0.805 | 0.754 | 0.911 | 0.825 | 0.915 | 0.910 |
+| CNN + GRU | 0.783 | 0.734 | 0.893 | 0.806 | 0.903 | 0.907 |
+| CNN + LSTM | 0.782 | 0.767 | 0.812 | 0.789 | 0.897 | 0.892 |
+| CNN | 0.793 | 0.818 | 0.757 | 0.786 | 0.900 | 0.893 |
+| CNN + SVM | 0.782 | 0.798 | 0.758 | 0.777 | 0.892 | 0.885 |
+| LSTM | 0.778 | 0.796 | 0.752 | 0.773 | 0.893 | 0.895 |
+| SVM | 0.744 | 0.742 | 0.752 | 0.747 | 0.859 | 0.853 |
+| KNN | 0.709 | 0.766 | 0.606 | 0.677 | 0.798 | 0.760 |
+
+On this split the CNN+GRU does not beat Random Forest. The difference appears only on real data.
+
+### Real driving sessions (CNN+GRU)
+
+These sessions contain no crashes, so every flagged window is a false alarm.
+
+| Session type | Sessions | Windows | Flagged as crash | Rate |
+|---|---|---|---|---|
+| Standard driving | 2 | 1,217 | 3 | 0.2% |
+| Speed bumps | 9 | 1,755 | 11 | 0.6% |
+| Aggressive driving | 1 | 1,249 | 12 | 1.0% |
+| Slow driving | 2 | 3,373 | 56 | 1.7% |
+| Potholes | 8 | 1,623 | 414 | 25.5% |
+| **Total** | **22** | **9,217** | **496** | **5.4%** |
+
+Random Forest on the same sessions flagged 100% of windows in all 22. One of 23 sessions could not be processed (its columns did not match the expected format) and is excluded.
 
 ## Repository structure
 
 ```text
-safetraq-ml-pipeline/
-├── data/
-│   ├── raw/
-│   │   ├── crashes/
-│   │   └── normal_driving/
-│   └── processed/
-├── docs/
+├── notebooks/
+│   └── 01_data_pipeline_and_models.ipynb   # the pipeline above, with outputs
+├── src/safetraq/
+│   ├── windowing.py        # create_windows: per-segment windows and labels
+│   ├── splitting.py        # split_by_group: leakage-safe GroupShuffleSplit
+│   └── data_validation.py  # sensor data checks
+├── tests/                  # 18 tests
 ├── models/
-│   ├── training/
-│   └── deployment/
-├── reports/
+│   ├── deployment/         # TFLite models and scaler parameters
+│   └── training/           # prototype model (see Legacy)
 ├── scripts/
-│   └── original/
-├── src/
-│   └── safetraq/
-├── tests/
-├── .gitignore
+│   ├── original/           # legacy prototype scripts
+│   └── validation/         # TFLite inspection script
+├── data/                   # synthetic sample data and prototype arrays
+├── docs/model_cards.md
 ├── pyproject.toml
-├── requirements.txt
-└── README.md
+└── requirements.txt
 ```
 
-## Data and preprocessing
+## Getting started
 
-The included raw CSV files were generated synthetically. They cover crash scenarios such as frontal impacts, side impacts, and rollovers, alongside normal-driving scenarios such as highway driving, hard braking, and potholes.
-
-The existing preprocessing script uses six features:
-
-- Accelerometer X, Y, and Z.
-- Gyroscope X, Y, and Z.
-
-The saved arrays have these shapes:
-
-| Artifact | Shape |
-|---|---|
-| `X_train.npy` | `(720, 500, 6)` |
-| `X_test.npy` | `(60, 500, 6)` |
-| `y_train.npy` | `(720,)` |
-| `y_test.npy` | `(60,)` |
-| `norm_mean.npy` | `(6,)` |
-| `norm_std.npy` | `(6,)` |
-
-The saved labels are balanced between the two classes in both arrays. These checks confirm the inspected array structure, not the realism of the generated signals or generalization to real driving.
-
-## Model artifacts
-
-### Training model
-
-`models/training/crash_detector.keras` is a CNN-LSTM model that loads successfully in the current Python environment.
-
-- Expected input shape: `(batch_size, 500, 6)`
-- Output shape: `(batch_size, 1)`
-
-The corresponding `crash_detector.tflite` file currently fails to initialize with the standard TensorFlow Lite interpreter because it requires support for a Select TensorFlow operation. This export needs further investigation before it can be described as ready for deployment.
-
-### Deployment models
-
-| Model | Input shape | Features |
-|---|---|---|
-| `accel_speed_crash_model.tflite` | `(1, 60, 4)` | Accelerometer XYZ and speed |
-| `cnn_gru_crash_model.tflite` | `(1, 60, 7)` | Accelerometer XYZ, gyroscope XYZ, and speed |
-
-Both deployment models successfully initialized in the current local TensorFlow Lite inspection.
-
-Each has a corresponding `scaler_params.json` file with the expected number of feature names, means, and scale values. Their numerical correctness, units, provenance, and compatibility with the original inference preprocessing still need to be verified.
-
-**These models use different input specifications from the six-feature, 500-timestep training arrays.** They should be treated as separate model pipelines unless their training and preprocessing histories can be established.
-
-## Reproducing the existing checks
-
-The project targets Python 3.10–3.12.
-
-Create and activate a virtual environment:
+Python 3.10 to 3.12.
 
 ```powershell
 py -3.11 -m venv .venv
 .\.venv\Scripts\Activate.ps1
-```
-
-Install the dependencies:
-
-```powershell
 python -m pip install --upgrade pip
 pip install -e .
-```
-
-Run the automated tests:
-
-```powershell
 python -m pytest -v
 ```
 
-Inspect the saved TensorFlow Lite models:
+### Reproducing the notebook
 
-```powershell
-python check_models.py
-```
+The notebook reads its data from Kaggle paths (`/kaggle/input/datasets/youssefashraf57/...`), which are not available locally. To rerun it, open it on Kaggle with those datasets attached, or point the loading cells at local copies. Source and licence details for each dataset still need to be documented in `data/README.md`.
 
-The last command applies to the local inspection script created during development; it is not yet part of the documented repository pipeline.
+## Model artifacts
 
-## Evaluation and known limitations
+| File | Input | Notes |
+|---|---|---|
+| `models/deployment/cnn_gru/cnn_gru_crash_model.tflite` | `(1, 60, 7)` | Same input specification as the notebook's CNN+GRU. The export code is not in the notebook (the conversion cell is commented out), so provenance is not fully documented. |
+| `models/deployment/accel_speed/accel_speed_crash_model.tflite` | `(1, 60, 4)` | Accelerometer XYZ and speed only. |
+| `models/training/crash_detector.keras` | `(500, 6)` | CNN+LSTM from the early prototype. Not the model reported above. |
 
-The original scripts are preserved under `scripts/original/`. Their behavior should not be confused with a fully validated, leakage-free production pipeline.
+More detail is in [`docs/model_cards.md`](docs/model_cards.md).
 
-In particular, the existing training script uses the test arrays as validation data for early stopping. Consequently, the test set is involved in model selection and cannot be treated as an untouched final evaluation set.
+## Limitations
 
-Further work should include:
-
-1. Establishing a clean, reproducible split strategy.
-2. Verifying timestamp handling, feature units, and windowing.
-3. Checking for leakage between related sensor recordings.
-4. Evaluating false positives and false negatives on appropriate data.
-5. Verifying scaler values and inference preprocessing against the deployment models.
-6. Recording reproducible evaluation results and limitations in `reports/`.
-
-Synthetic-data results alone cannot establish real-world crash-detection reliability.
+- **No crash recall on real data.** The real sessions contain no crashes, so only false alarms were measured there. How well the model detects real crashes is untested.
+- **Pothole false alarms.** 25.5% of pothole windows were flagged, and one session accounts for most of them.
+- **Simulated training data.** Crash examples come from simulation, and simulated crashes may not match real ones.
+- **Early stopping is not group-aware.** The deep models use `validation_split=0.2` on the training windows, which can leak between overlapping windows of the same segment. The test set itself was never used for early stopping.
+- **Single split.** Results come from one group split with one seed, with no repeated runs or confidence intervals.
+- **Reproducibility.** The notebook depends on Kaggle-hosted datasets, and the deployment models' preprocessing and export are not yet verified end to end.
+- **Legacy prototype.** The scripts in `scripts/original/` use 5-second, 500-step windows and a CNN+LSTM, and the prototype's early stopping uses the test arrays. They are kept for history only.
 
 ## Safety
 
-This project is experimental and is not a certified vehicle-safety system. It must not be relied upon as the sole means of crash detection or emergency notification. Real-world deployment would require rigorous testing on representative, appropriately labeled data and across different devices and driving conditions.
+This is an experimental research project, not a certified vehicle-safety system. It must not be relied on as the only means of crash detection or emergency notification.
 
-## Background and attribution
+## Attribution
 
-SafeTraq originated as a team graduation project. This repository is a separate, ML-focused organization of selected data, scripts, and model artifacts. It does not claim sole ownership of the full Android application, web application, or all original team contributions.
+SafeTraq was a six-person graduation project. I owned the data preprocessing and the machine-learning work in this repository. The Android application, the website and the original project infrastructure were built by teammates, in the [team repository](https://github.com/AHDABOSAMA/Crash_Detection_App).
 
 ## License
 
-No license has been selected. Until a license is added, reuse permissions should not be assumed.
-
-## Reusable Pipeline Utilities
-
-The project includes reusable Python utilities under `src/safetraq/`:
-
-- **`data_validation.py`** — validates sensor data and checks for common data-quality issues.
-- **`windowing.py`** — converts sensor readings into fixed-length windows. The default window size is 60 samples, with a step size of 30 samples.
-- **`splitting.py`** — provides group-aware train/test splitting using scikit-learn's `GroupShuffleSplit`, helping prevent windows from the same segment from appearing in both sets.
-
-Automated tests for these utilities are located in `tests/`. The latest recorded test run passed all 18 tests.
-
-**Current limitation:** These utilities are tested individually, but the original training scripts have not yet been confirmed to use them as one integrated pipeline. Passing unit tests does not establish real-world crash-detection accuracy or deployment readiness.
+MIT. See [LICENSE](LICENSE).
