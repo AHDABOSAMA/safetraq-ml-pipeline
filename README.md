@@ -1,65 +1,100 @@
 # SafeTraq ML Pipeline
 
-A machine learning engineering project focused on detecting potential vehicle crashes from smartphone motion-sensor data.
+An ML engineering project focused on detecting potential vehicle crashes using smartphone motion-sensor data.
 
-This repository develops a standalone, reproducible ML workflow inspired by the SafeTraq graduation project. It focuses on data quality, preprocessing, model evaluation, and deployment considerations rather than the full Android application.
+This repository organizes and validates the machine-learning components of SafeTraq, a team graduation project involving smartphone-based crash detection. It provides a separate, ML-focused workspace for inspecting datasets, preprocessing sensor signals, evaluating models, and documenting deployment requirements.
 
-> **Project status:** Initial repository setup. The pipeline is being built and validated incrementally. Results will be documented only after they can be reproduced and verified.
+> **Current status:** The repository contains synthetic sensor data, preprocessed arrays, original training scripts, and four model files. Initial structural checks have been completed. Full inference validation, reproducible evaluation, and training-to-deployment consistency checks remain in progress.
 
 ## Problem
 
-Smartphone accelerometer and gyroscope readings can capture sudden changes in vehicle motion. However, abrupt braking, potholes, and speed bumps may resemble crash events. A useful crash-detection system must therefore evaluate both its ability to detect crashes and its ability to avoid false alarms.
+Accelerometer and gyroscope readings can capture sudden changes in vehicle motion. However, hard braking, potholes, and other ordinary driving events may resemble crashes. A useful crash-detection system must evaluate both crash detection and false alarms.
 
-## Objectives
+## Repository contents
 
-- Establish a clear, reproducible ML project structure.
-- Document sensor features, sampling assumptions, and windowing.
-- Prevent data leakage between training and evaluation.
-- Compare appropriate classification approaches.
-- Evaluate false positives, false negatives, precision, recall, and other relevant metrics.
-- Prepare for deployment constraints, including consistency between training preprocessing and inference.
+- **Synthetic sensor data:** 300 CSV files across six generated scenarios.
+- **Processed data:** Training and test arrays, labels, and normalization parameters.
+- **Original training scripts:** Data generation, preprocessing, model training, and evaluation.
+- **Training artifacts:** A Keras model and a TensorFlow Lite export.
+- **Deployment artifacts:** Two TensorFlow Lite models with associated scaler parameter files.
+- **Validation code:** A Python data-validation module and automated tests.
 
-## Planned workflow
-
-1. **Data validation:** inspect labels, feature columns, missing values, sampling intervals, and class balance.
-2. **Segmentation:** handle timestamp gaps and create fixed-length sensor windows.
-3. **Data splitting:** separate training and evaluation data before fitting preprocessing steps.
-4. **Preprocessing:** fit normalization parameters on training data only.
-5. **Model training:** establish a baseline before evaluating more complex architectures.
-6. **Evaluation:** report confusion matrices, precision, recall, and false-positive behavior.
-7. **Export readiness:** document the preprocessing and input requirements needed for consistent inference.
-
-These are development goals, not claims that every stage has already been implemented.
-
-## Sensor data
-
-The project is designed around smartphone motion-sensor time series, particularly:
-
-- Accelerometer readings along the X, Y, and Z axes.
-- Gyroscope readings along the X, Y, and Z axes.
-- Additional sensor features only when their availability and use are documented.
-
-The intended windowing and sampling configuration will be explicitly documented and validated against the source data before model training.
+The data and model artifacts are included in this repository. Their presence does not, by itself, establish real-world accuracy or deployment readiness.
 
 ## Repository structure
 
 ```text
 safetraq-ml-pipeline/
-├── configs/          # Pipeline configuration
-├── docs/             # Methodology and technical documentation
-├── reports/          # Tracked evaluation summaries
+├── data/
+│   ├── raw/
+│   │   ├── crashes/
+│   │   └── normal_driving/
+│   └── processed/
+├── docs/
+├── models/
+│   ├── training/
+│   └── deployment/
+├── reports/
+├── scripts/
+│   └── original/
 ├── src/
-│   └── safetraq/     # Python package
-├── tests/            # Automated tests
+│   └── safetraq/
+├── tests/
 ├── .gitignore
 ├── pyproject.toml
 ├── requirements.txt
 └── README.md
 ```
 
-## Installation
+## Data and preprocessing
 
-The project currently targets Python 3.10–3.12.
+The included raw CSV files were generated synthetically. They cover crash scenarios such as frontal impacts, side impacts, and rollovers, alongside normal-driving scenarios such as highway driving, hard braking, and potholes.
+
+The existing preprocessing script uses six features:
+
+- Accelerometer X, Y, and Z.
+- Gyroscope X, Y, and Z.
+
+The saved arrays have these shapes:
+
+| Artifact | Shape |
+|---|---|
+| `X_train.npy` | `(720, 500, 6)` |
+| `X_test.npy` | `(60, 500, 6)` |
+| `y_train.npy` | `(720,)` |
+| `y_test.npy` | `(60,)` |
+| `norm_mean.npy` | `(6,)` |
+| `norm_std.npy` | `(6,)` |
+
+The saved labels are balanced between the two classes in both arrays. These checks confirm the inspected array structure, not the realism of the generated signals or generalization to real driving.
+
+## Model artifacts
+
+### Training model
+
+`models/training/crash_detector.keras` is a CNN-LSTM model that loads successfully in the current Python environment.
+
+- Expected input shape: `(batch_size, 500, 6)`
+- Output shape: `(batch_size, 1)`
+
+The corresponding `crash_detector.tflite` file currently fails to initialize with the standard TensorFlow Lite interpreter because it requires support for a Select TensorFlow operation. This export needs further investigation before it can be described as ready for deployment.
+
+### Deployment models
+
+| Model | Input shape | Features |
+|---|---|---|
+| `accel_speed_crash_model.tflite` | `(1, 60, 4)` | Accelerometer XYZ and speed |
+| `cnn_gru_crash_model.tflite` | `(1, 60, 7)` | Accelerometer XYZ, gyroscope XYZ, and speed |
+
+Both deployment models successfully initialized in the current local TensorFlow Lite inspection.
+
+Each has a corresponding `scaler_params.json` file with the expected number of feature names, means, and scale values. Their numerical correctness, units, provenance, and compatibility with the original inference preprocessing still need to be verified.
+
+**These models use different input specifications from the six-feature, 500-timestep training arrays.** They should be treated as separate model pipelines unless their training and preprocessing histories can be established.
+
+## Reproducing the existing checks
+
+The project targets Python 3.10–3.12.
 
 Create and activate a virtual environment:
 
@@ -68,33 +103,52 @@ py -3.11 -m venv .venv
 .\.venv\Scripts\Activate.ps1
 ```
 
-Install the project and its dependencies:
+Install the dependencies:
 
 ```powershell
 python -m pip install --upgrade pip
 pip install -e .
 ```
 
-If Python 3.11 is not installed, check your available Python versions before proceeding.
+Run the automated tests:
 
-## Data and reproducibility
+```powershell
+python -m pytest -v
+```
 
-Datasets, generated arrays, and trained model binaries are excluded from version control by default. This keeps the repository focused on source code, configuration, tests, and documented results.
+Inspect the saved TensorFlow Lite models:
 
-The source project includes synthetic sensor-data generation. Synthetic data can help validate pipeline mechanics, but performance measured only on synthetic data does **not** establish real-world crash-detection reliability.
+```powershell
+python check_models.py
+```
 
-Any reported metrics should identify the dataset, split strategy, preprocessing, decision threshold, and evaluation procedure used.
+The last command applies to the local inspection script created during development; it is not yet part of the documented repository pipeline.
 
-## Limitations and safety
+## Evaluation and known limitations
 
-This project is experimental and is not a certified vehicle-safety system. It must not be relied upon as the sole means of crash detection or emergency notification.
+The original scripts are preserved under `scripts/original/`. Their behavior should not be confused with a fully validated, leakage-free production pipeline.
 
-Real-world validation requires appropriately collected and labeled sensor data, realistic non-crash events, careful false-alarm analysis, and testing across devices and driving conditions.
+In particular, the existing training script uses the test arrays as validation data for early stopping. Consequently, the test set is involved in model selection and cannot be treated as an untouched final evaluation set.
 
-## Background
+Further work should include:
 
-SafeTraq originated as a graduation project involving smartphone-based crash detection and emergency-alert functionality. This repository is a separate, ML-focused engineering effort. It does not claim ownership of the entire team application or imply that the complete workflow described above is already implemented.
+1. Establishing a clean, reproducible split strategy.
+2. Verifying timestamp handling, feature units, and windowing.
+3. Checking for leakage between related sensor recordings.
+4. Evaluating false positives and false negatives on appropriate data.
+5. Verifying scaler values and inference preprocessing against the deployment models.
+6. Recording reproducible evaluation results and limitations in `reports/`.
+
+Synthetic-data results alone cannot establish real-world crash-detection reliability.
+
+## Safety
+
+This project is experimental and is not a certified vehicle-safety system. It must not be relied upon as the sole means of crash detection or emergency notification. Real-world deployment would require rigorous testing on representative, appropriately labeled data and across different devices and driving conditions.
+
+## Background and attribution
+
+SafeTraq originated as a team graduation project. This repository is a separate, ML-focused organization of selected data, scripts, and model artifacts. It does not claim sole ownership of the full Android application, web application, or all original team contributions.
 
 ## License
 
-A license has not yet been selected. Until one is added, reuse permissions should not be assumed.
+No license has been selected. Until a license is added, reuse permissions should not be assumed.
