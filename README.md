@@ -152,3 +152,15 @@ SafeTraq originated as a team graduation project. This repository is a separate,
 ## License
 
 No license has been selected. Until a license is added, reuse permissions should not be assumed.
+
+## Reusable Pipeline Utilities
+
+The project includes reusable Python utilities under `src/safetraq/`:
+
+- **`data_validation.py`** — validates sensor data and checks for common data-quality issues.
+- **`windowing.py`** — converts sensor readings into fixed-length windows. The default window size is 60 samples, with a step size of 30 samples.
+- **`splitting.py`** — provides group-aware train/test splitting using scikit-learn's `GroupShuffleSplit`, helping prevent windows from the same segment from appearing in both sets.
+
+Automated tests for these utilities are located in `tests/`. The latest recorded test run passed all 18 tests.
+
+**Current limitation:** These utilities are tested individually, but the original training scripts have not yet been confirmed to use them as one integrated pipeline. Passing unit tests does not establish real-world crash-detection accuracy or deployment readiness.
