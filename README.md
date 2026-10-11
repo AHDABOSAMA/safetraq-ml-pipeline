@@ -1,5 +1,7 @@
 # SafeTraq ML Pipeline
 
+[![Tests](https://github.com/AHDABOSAMA/safetraq-ml-pipeline/actions/workflows/tests.yml/badge.svg)](https://github.com/AHDABOSAMA/safetraq-ml-pipeline/actions/workflows/tests.yml)
+
 Crash detection from smartphone motion-sensor data: data preparation, model comparison, and a stress test on real driving sessions.
 
 This repository holds the machine-learning part of **SafeTraq**, a team graduation project (Ain Shams University, 2026). The Android app and website were built by teammates and live in the team repository: [Crash_Detection_App](https://github.com/AHDABOSAMA/Crash_Detection_App).
@@ -69,8 +71,9 @@ Random Forest on the same sessions flagged 100% of windows in all 22. One of 23 
 ├── src/safetraq/
 │   ├── windowing.py        # create_windows: per-segment windows and labels
 │   ├── splitting.py        # split_by_group: leakage-safe GroupShuffleSplit
+│   ├── scaling.py          # fit_scaler: StandardScaler fitted on training data only
 │   └── data_validation.py  # sensor data checks
-├── tests/                  # 18 tests
+├── tests/                  # 25 tests
 ├── models/
 │   ├── deployment/         # TFLite models and scaler parameters
 │   └── training/           # prototype model (see Legacy)
@@ -97,7 +100,7 @@ python -m pytest -v
 
 ### Reproducing the notebook
 
-The notebook reads its data from Kaggle paths (`/kaggle/input/datasets/youssefashraf57/...`), which are not available locally. To rerun it, open it on Kaggle with those datasets attached, or point the loading cells at local copies. Source and licence details for each dataset still need to be documented in `data/README.md`.
+The notebook reads its data from Kaggle paths (`/kaggle/input/datasets/youssefashraf57/...`), which are not available locally. To rerun it, open it on Kaggle with those datasets attached, or point the loading cells at local copies. Dataset names, files and provenance are listed in [`data/README.md`](data/README.md).
 
 ## Model artifacts
 

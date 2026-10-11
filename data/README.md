@@ -44,11 +44,28 @@ The preprocessing script is also part of the legacy workflow. Review `scripts/or
 
 ## Thesis Pipeline and External Datasets
 
-The thesis experiments are documented in `notebooks/01_data_pipeline_and_models.ipynb`. That notebook is separate from the legacy prototype workflow.
+The thesis experiments are in `notebooks/01_data_pipeline_and_models.ipynb`. The notebook reads seven simulation datasets and a set of real driving sessions from Kaggle. None of them are stored in this repository.
 
-Consult the notebook's data-loading cells and the original dataset pages for the required external datasets, their provenance, and their license terms. Those details should be verified before redistributing or publishing the datasets.
+| Kaggle dataset | Files | Source ID in the notebook |
+|---|---|---|
+| `youssefashraf57/crash-data` | `crash_data.csv`, `crash_data_log.csv`, `all_crash_data.csv` | PC1 |
+| `youssefashraf57/crash-data1` | `all_crash_data1.csv`, `normal_driving_data.csv`, `highway_driving_data.csv`, `traffic_jam_data.csv` | PC2 |
+| `youssefashraf57/real-data` | 23 real driving sessions: 6 driving-behaviour sessions (aggressive, standard, slow) and 17 road-anomaly sessions (9 speed bumps, 8 potholes) | Used only for the real-data test |
 
-The original external datasets are not included in this directory by this documentation alone.
+The seven simulation files are the crash, normal, highway and traffic-jam recordings from the two simulation machines. After cleaning, segmenting and windowing, they give 6,830 windows. The real sessions contain no crashes and are used only to measure false alarms.
+
+### Provenance and licence
+
+| Dataset | Created by | Licence |
+|---|---|---|
+| `crash-data`, `crash-data1` | SafeTraq project team (simulation) | FILL IN |
+| `real-data` | FILL IN (original collectors of the road sessions) | FILL IN |
+
+Check each dataset's Kaggle page (the License and About sections) before redistributing any of its files.
+
+### Running the notebook
+
+The notebook uses Kaggle paths of the form `/kaggle/input/datasets/youssefashraf57/<dataset>/...`. To rerun it, open it on Kaggle with these datasets attached, or edit the loading cells to point at local copies.
 
 ## Version Control and Reproducibility
 
