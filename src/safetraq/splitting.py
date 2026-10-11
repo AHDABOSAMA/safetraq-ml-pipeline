@@ -1,8 +1,13 @@
 """Group-aware splitting utilities for the SafeTraq pipeline."""
 
+import logging
+
 import numpy as np
 import pandas as pd
 from sklearn.model_selection import GroupShuffleSplit
+
+
+logger = logging.getLogger(__name__)
 
 
 def split_by_group(
@@ -19,10 +24,14 @@ def split_by_group(
     groups = np.asarray(groups)
 
     if X.ndim == 0 or y.ndim != 1 or groups.ndim != 1:
-        raise ValueError("X must have samples; y and groups must be one-dimensional.")
+        raise ValueError(
+            "X must have samples; y and groups must be one-dimensional."
+        )
 
     if len(X) != len(y) or len(y) != len(groups):
-        raise ValueError("X, y, and groups must contain the same number of samples.")
+        raise ValueError(
+            "X, y, and groups must contain the same number of samples."
+        )
 
     if len(y) == 0:
         raise ValueError("Cannot split an empty dataset.")
@@ -42,5 +51,15 @@ def split_by_group(
         random_state=random_state,
     )
     train_indices, test_indices = next(splitter.split(X, y, groups))
+
+    logger.info(
+        "Split %d windows into %d train / %d test "
+        "(%d train groups, %d test groups)",
+        len(y),
+        len(train_indices),
+        len(test_indices),
+        len(np.unique(groups[train_indices])),
+        len(np.unique(groups[test_indices])),
+    )
 
     return train_indices, test_indices

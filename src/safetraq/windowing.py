@@ -1,9 +1,13 @@
 """Windowing utilities for the SafeTraq sensor pipeline."""
 
+import logging
 from collections.abc import Sequence
 
 import numpy as np
 import pandas as pd
+
+
+logger = logging.getLogger(__name__)
 
 
 DEFAULT_FEATURE_COLUMNS = (
@@ -50,7 +54,9 @@ def create_windows(
         )
 
     if data[list(feature_columns) + [label_column]].isna().any().any():
-        raise ValueError("Feature and label columns must not contain missing values.")
+        raise ValueError(
+            "Feature and label columns must not contain missing values."
+        )
 
     windows: list[np.ndarray] = []
     labels: list[int] = []
@@ -63,21 +69,42 @@ def create_windows(
             raise ValueError("Segment keys must not be missing.")
 
         segment_data = segment_data.reset_index(drop=True)
+
         if len(segment_data) < window_size:
+            logger.debug(
+                "Skipping segment %s: %d rows is shorter than window_size %d",
+                segment_key,
+                len(segment_data),
+                window_size,
+            )
             continue
 
-        for start in range(0, len(segment_data) - window_size + 1, step_size):
+        for start in range(
+            0, len(segment_data) - window_size + 1, step_size
+        ):
             window = segment_data.iloc[start : start + window_size]
 
             windows.append(
-                window.loc[:, list(feature_columns)].to_numpy(dtype=np.float32)
+                window.loc[:, list(feature_columns)].to_numpy(
+                    dtype=np.float32
+                )
             )
             labels.append(int(window[label_column].max() > 0))
             groups.append(segment_key)
 
+    logger.info(
+        "Created %d windows (%d positive) from %d segments",
+        len(windows),
+        sum(labels),
+        len(set(groups)),
+    )
+
     if not windows:
         return (
-            np.empty((0, window_size, len(feature_columns)), dtype=np.float32),
+            np.empty(
+                (0, window_size, len(feature_columns)),
+                dtype=np.float32,
+            ),
             np.empty((0,), dtype=np.int32),
             np.empty((0,), dtype=object),
         )
