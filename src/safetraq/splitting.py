@@ -1,4 +1,4 @@
-﻿"""Group-aware splitting utilities for the SafeTraq pipeline."""
+"""Group-aware splitting utilities for the SafeTraq pipeline."""
 
 import numpy as np
 import pandas as pd
