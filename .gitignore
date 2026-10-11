@@ -33,3 +33,7 @@ reports/*
 
 # Generated Python package metadata
 *.egg-info/
+
+# Generated data (regenerate with scripts/original/1_generate_data.py)
+data/raw/
+data/processed/
