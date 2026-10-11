@@ -1,4 +1,4 @@
-﻿"""Windowing utilities for the SafeTraq sensor pipeline."""
+"""Windowing utilities for the SafeTraq sensor pipeline."""
 
 from collections.abc import Sequence
 
